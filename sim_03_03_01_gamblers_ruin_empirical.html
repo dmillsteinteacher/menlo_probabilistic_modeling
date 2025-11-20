@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empirical Gambler's Ruin Simulator</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- KaTeX CSS and JS for rendering LaTeX math -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" xintegrity="sha384-GvrFXWq6FV5bWJqL5lO/QWvQ22I09iF/wz48K3L+P3g3f5T/8iR7ZJ/e/WwE+2s" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" xintegrity="sha384-Y1Wp1o75z0z3/R/nJbWz4z5O7Gz0v8K5M5WJ/e/WwE+2s" crossorigin="anonymous"></script>
+
+    <style>
+        /* Custom styles for a clean, academic look */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7ffec; /* Light green/academic background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+        }
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            border-radius: 0.75rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+        }
+        .loading-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .spinner {
+            border: 6px solid rgba(132, 204, 22, 0.2); /* Light green/lime */
+            border-left-color: #4ade80; /* Brighter green */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-lime-50">
+    <div class="container bg-white p-8 shadow-2xl rounded-xl border-t-8 border-lime-600 relative">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2 text-center">Random Walk: Empirical Gambler's Ruin</h1>
+        <p class="text-gray-600 mb-6 text-center text-lg">
+            Run a large-scale simulation to generate data for analytical comparison.
+        </p>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay">
+            <div class="spinner"></div>
+            <p class="ml-4 mt-4 text-xl font-bold text-gray-700">Simulating walks... please wait.</p>
+            <p class="text-sm text-gray-500 mt-1" id="loading-message">Starting simulation...</p>
+        </div>
+
+        <!-- Input Parameters Section -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 p-4 border border-lime-200 rounded-lg bg-lime-50">
+            <div>
+                <label for="total-states" class="block text-sm font-semibold text-gray-700">Win Goal (N)</label>
+                <input type="number" id="total-states" value="10" min="2" class="mt-1 block w-full rounded-md border-lime-300 shadow-sm focus:border-lime-500 focus:ring-lime-500 p-2 border" placeholder="e.g., 10">
+                <p class="text-xs text-gray-500 mt-1">Total states (0 to N).</p>
+            </div>
+            <div>
+                <label for="start-state" class="block text-sm font-semibold text-gray-700">Start State (n)</label>
+                <input type="number" id="start-state" value="4" min="1" class="mt-1 block w-full rounded-md border-lime-300 shadow-sm focus:border-lime-500 focus:ring-lime-500 p-2 border" placeholder="e.g., 4">
+                <p class="text-xs text-gray-500 mt-1">Must be between 1 and N-1.</p>
+            </div>
+            <div>
+                <label for="success-prob" class="block text-sm font-semibold text-gray-700">P(Success) (p)</label>
+                <input type="number" id="success-prob" value="0.4" step="0.01" min="0.01" max="0.99" class="mt-1 block w-full rounded-md border-lime-300 shadow-sm focus:border-lime-500 focus:ring-lime-500 p-2 border" placeholder="e.g., 0.4">
+                <p class="text-xs text-gray-500 mt-1">Probability of moving up.</p>
+            </div>
+            <div>
+                <label for="num-simulations" class="block text-sm font-semibold text-gray-700">Simulations (M)</label>
+                <input type="number" id="num-simulations" value="100000" min="1000" max="1000000" step="10000" class="mt-1 block w-full rounded-md border-lime-300 shadow-sm focus:border-lime-500 focus:ring-lime-500 p-2 border" placeholder="e.g., 100000">
+                <p class="text-xs text-gray-500 mt-1">Total random walks to run.</p>
+            </div>
+        </div>
+
+        <!-- Simulation Button -->
+        <div class="text-center mb-8">
+            <button onclick="runEmpiricalSimulation()" id="run-button" class="bg-lime-600 hover:bg-lime-700 text-white font-bold py-3 px-8 rounded-lg shadow-md transition duration-150 ease-in-out text-lg focus:outline-none focus:ring-4 focus:ring-lime-300 disabled:opacity-50">
+                Run M Simulations
+            </button>
+        </div>
+        
+        <!-- Results Display Table -->
+        <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2 border-gray-200">Empirical Results</h2>
+        <div class="bg-white border border-gray-200 rounded-lg shadow-inner overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">Metric</th>
+                        <th class="px-6 py-3 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">Empirical Value</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-lg font-medium text-gray-900">Probability of Ruin <span id="label-prob-ruin"></span></td>
+                        <td id="emp-prob-ruin" class="px-6 py-4 whitespace-nowrap text-lg text-red-600 font-bold">--</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-lg font-medium text-gray-900">Probability of Winning <span id="label-prob-win"></span></td>
+                        <td id="emp-prob-win" class="px-6 py-4 whitespace-nowrap text-lg text-green-600 font-bold">--</td>
+                    </tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-lg font-medium text-gray-900">Expected Steps <span id="label-expected-time"></span></td>
+                        <td id="emp-expected-time" class="px-6 py-4 whitespace-nowrap text-lg text-blue-600 font-bold">--</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Error Message -->
+        <div id="error-message" class="mt-6 text-red-700 font-semibold bg-red-100 p-3 rounded-lg hidden"></div>
+
+    </div>
+
+    <script>
+        // --- Utility function to render LaTeX labels using KaTeX ---
+        function renderLatexLabels() {
+            if (typeof katex !== 'undefined') {
+                try {
+                    // P_0(n)
+                    katex.render("P_0(n)", document.getElementById('label-prob-ruin'), {
+                        throwOnError: false
+                    });
+                    // P_N(n)
+                    katex.render("P_N(n)", document.getElementById('label-prob-win'), {
+                        throwOnError: false
+                    });
+                    // E(n)
+                    katex.render("E(n)", document.getElementById('label-expected-time'), {
+                        throwOnError: false
+                    });
+                } catch (e) {
+                    console.error("KaTeX rendering failed:", e);
+                }
+            }
+        }
+        
+        // --- Core Empirical Simulation Logic ---
+
+        /**
+         * Runs a single random walk simulation.
+         * @param {number} N - Total states (Win Goal).
+         * @param {number} p - Probability of success (moving up).
+         * @param {number} n_start - Starting state.
+         * @returns {{finalState: number, steps: number}} - Result of the walk.
+         */
+        function runSingleWalk(N, p, n_start) {
+            let current_n = n_start;
+            let steps = 0;
+
+            // Loop until an absorbing state (0 or N) is reached
+            while (current_n > 0 && current_n < N) {
+                // Determine direction based on probability p
+                if (Math.random() < p) {
+                    current_n++; // Move toward N (Win)
+                } else {
+                    current_n--; // Move toward 0 (Ruin)
+                }
+                steps++;
+            }
+            return { finalState: current_n, steps: steps };
+        }
+
+        /**
+         * Validates inputs, runs the large-scale simulation, and updates the display.
+         */
+        function runEmpiricalSimulation() {
+            // Get all parameters
+            const N = parseInt(document.getElementById('total-states').value);
+            const p = parseFloat(document.getElementById('success-prob').value);
+            const n_start = parseInt(document.getElementById('start-state').value);
+            const M = parseInt(document.getElementById('num-simulations').value);
+
+            const empProbRuinEl = document.getElementById('emp-prob-ruin');
+            const empProbWinEl = document.getElementById('emp-prob-win');
+            const empExpectedTimeEl = document.getElementById('emp-expected-time');
+            const errorDiv = document.getElementById('error-message');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const runButton = document.getElementById('run-button');
+            const loadingMessage = document.getElementById('loading-message');
+            
+            // --- 1. Input Validation ---
+            if (isNaN(N) || isNaN(p) || isNaN(n_start) || isNaN(M) || M < 100 || N <= 1 || p <= 0 || p >= 1 || n_start < 1 || n_start >= N) {
+                errorDiv.textContent = `Error: Please ensure M >= 100, N > 1, 0 < p < 1, and 1 <= n <= ${N - 1}.`;
+                errorDiv.classList.remove('hidden');
+                empProbRuinEl.textContent = '--';
+                empProbWinEl.textContent = '--';
+                empExpectedTimeEl.textContent = '--';
+                return;
+            }
+            errorDiv.classList.add('hidden');
+
+            // --- 2. Setup and Execution ---
+            runButton.disabled = true;
+            loadingMessage.textContent = `Starting ${M.toLocaleString()} simulations...`;
+            loadingOverlay.classList.add('visible');
+            
+            // Use a timeout to allow the loading spinner to render before computation starts, preventing UI lockup
+            setTimeout(() => {
+                let ruinCount = 0;
+                let totalSteps = 0;
+                
+                const startTime = performance.now();
+
+                // Run M number of simulations
+                for (let i = 0; i < M; i++) {
+                    const result = runSingleWalk(N, p, n_start);
+                    totalSteps += result.steps;
+                    if (result.finalState === 0) {
+                        ruinCount++;
+                    }
+                    
+                    // Optional: Update loading message periodically for very long runs
+                    if (M >= 100000 && i % (M / 10) === 0 && i !== 0) {
+                        loadingMessage.textContent = `Simulated ${i.toLocaleString()} walks...`;
+                    }
+                }
+
+                const endTime = performance.now();
+                const totalTime = ((endTime - startTime) / 1000).toFixed(2);
+
+                // --- 3. Calculate Empirical Metrics ---
+                const empProbRuin = ruinCount / M;
+                const empProbWin = (M - ruinCount) / M;
+                const empExpectedTime = totalSteps / M;
+
+                // --- 4. Update Display ---
+                empProbRuinEl.textContent = empProbRuin.toFixed(5);
+                empProbWinEl.textContent = empProbWin.toFixed(5);
+                empExpectedTimeEl.textContent = empExpectedTime.toFixed(2);
+                
+                loadingOverlay.classList.remove('visible');
+                runButton.disabled = false;
+                
+                // Show success message briefly
+                errorDiv.textContent = `Simulation complete! Time taken: ${totalTime} seconds for ${M.toLocaleString()} runs.`;
+                errorDiv.classList.remove('hidden');
+                errorDiv.classList.remove('bg-red-100', 'text-red-700');
+                errorDiv.classList.add('bg-green-100', 'text-green-700');
+
+                // Reset message style after a delay
+                setTimeout(() => {
+                    errorDiv.classList.add('hidden');
+                    errorDiv.classList.remove('bg-green-100', 'text-green-700');
+                    errorDiv.classList.add('bg-red-100', 'text-red-700');
+                }, 5000);
+
+            }, 50); // Small delay to ensure loading state shows
+        }
+
+        // Auto-run a small simulation on load for immediate results
+        window.onload = function() {
+            // Render the LaTeX labels immediately upon load
+            renderLatexLabels(); 
+            
+            // Set M to 10,000 for faster initial load
+            document.getElementById('num-simulations').value = 10000;
+            runEmpiricalSimulation();
+            // Reset M back to 100,000 after the initial run for better accuracy
+            document.getElementById('num-simulations').value = 100000;
+        };
+    </script>
+</body>
+</html>
